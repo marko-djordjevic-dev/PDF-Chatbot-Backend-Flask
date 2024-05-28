@@ -1,0 +1,10 @@
+.vscode
+myenv
+migrations
+__pycache__
+myenv
+upload/*
+index_store/*
+app/avatar/*
+.env
+venv
