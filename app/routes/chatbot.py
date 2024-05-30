@@ -219,7 +219,7 @@ def get_ai_resposne(current_user):
     if chatbot is None:
         return {'message':'Chatbot not found'}, 500
     
-    vector_index = FAISS.load_local(f"index_store/{chatbot.index_name}", current_app.embeddings)
+    vector_index = FAISS.load_local(f"index_store/{chatbot.index_name}", current_app.embeddings, allow_dangerous_deserialization=True)
     retriever = vector_index.as_retriever(search_type="similarity", search_kwargs={"k": 6})
 
     llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo')
