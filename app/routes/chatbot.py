@@ -230,7 +230,7 @@ def get_ai_resposne():
     db_chat_history = chatbot_session.chat_history
 
     chat_history = []
-    conv_history = []
+    conv_history = ""
 
     response_tokens = []
 
@@ -243,7 +243,10 @@ def get_ai_resposne():
                 "human": user_string,
                 "ai": system_string
             })
-            conv_history.append((user_string, system_string))
+
+            human = "Human: " + user_string
+            ai = "Assistant: " + system_string
+            conv_history += "\n" + "\n".join([human, ai])
 
 
     llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo', streaming=True)
