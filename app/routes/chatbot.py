@@ -1,4 +1,3 @@
-from fastapi.responses import StreamingResponse
 from langchain.chains import ConversationalRetrievalChain
 from langchain_openai.chat_models import ChatOpenAI
 
