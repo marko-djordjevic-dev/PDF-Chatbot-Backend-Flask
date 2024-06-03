@@ -1,10 +1,9 @@
-from langchain.vectorstores.faiss import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from fastapi.responses import StreamingResponse
 from langchain.chains import ConversationalRetrievalChain
 from langchain_openai.chat_models import ChatOpenAI
 
 import uuid
-from flask import Blueprint, request, current_app, send_from_directory
+from flask import Blueprint, Response, request, current_app, send_from_directory
 from auth_middleware import token_required
 from .. import db
 from app.models.Chatbot import Chatbot
@@ -14,6 +13,13 @@ from app import Config
 from PyPDF2 import PdfReader
 import os
 import shutil
+from langchain_community.vectorstores import FAISS
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.schema.messages import (
+    HumanMessage,
+    SystemMessage,
+)
+
 
 chatbot_bp = Blueprint('chatbot', __name__, url_prefix='/chatbot')
 
@@ -90,8 +96,8 @@ def add_bot(current_user):
     }
 
 @chatbot_bp.route('/chatbot_list', methods = ['POST'])
-@token_required
-def chatbot_list(current_user):
+# @token_required
+def chatbot_list():
     return  [{
             'id': chatbot.id,
             'name': chatbot.name
@@ -178,8 +184,8 @@ def update_chatbot_setting(current_user):
     return "success"
 
 @chatbot_bp.route('/chatbot_setting_session', methods = ['POST'])
-@token_required
-def chatbot_setting_session(current_user):
+# @token_required
+def chatbot_setting_session():
     session = ChatbotSession.query.filter_by(id=request.json['id']).first()
     if session is None:
         return {'message':'You are not allowed'}, 400
@@ -192,14 +198,15 @@ def chatbot_setting_session(current_user):
     }
 
 @chatbot_bp.route('/create_session', methods=['POST'])
-@token_required
-def create_session(current_user):
+# @token_required
+def create_session():
+    user_id = request.json['user_id']
     chatbot_id = request.json['chatbot_id']
     session_id = uuid.uuid4().hex
 
     chatbot_session = ChatbotSession(
         id= session_id,
-        user_id=current_user.id,
+        user_id=user_id,
         chatbot_id=chatbot_id,
         chat_history=[]
     )
@@ -208,10 +215,11 @@ def create_session(current_user):
     return session_id
 
 @chatbot_bp.route('/get_ai_response', methods=['POST'])
-@token_required
-def get_ai_resposne(current_user):
+# @token_required
+def get_ai_resposne():
     session_id = request.json['session_id']
     chatbot_session = ChatbotSession.query.filter_by(id=session_id).first()
+    query = request.json['message']
     if chatbot_session is None:
         return {'message':'Session not found'}, 500
     
@@ -220,19 +228,13 @@ def get_ai_resposne(current_user):
         return {'message':'Chatbot not found'}, 500
     
     vector_index = FAISS.load_local(f"index_store/{chatbot.index_name}", current_app.embeddings, allow_dangerous_deserialization=True)
-    retriever = vector_index.as_retriever(search_type="similarity", search_kwargs={"k": 6})
-
-    llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo')
-    conv_interface = ConversationalRetrievalChain.from_llm(llm, retriever=retriever, return_source_documents=True, verbose=False)
-
     db_chat_history = chatbot_session.chat_history
-    if db_chat_history is None:
-        db_chat_history = []
+
     chat_history = []
     conv_history = []
 
-    user_string = ""
-    system_string = ""
+    response_tokens = []
+
     for history in db_chat_history:
         if history.startswith("human:"):
             user_string = history[6:].strip()
@@ -243,25 +245,37 @@ def get_ai_resposne(current_user):
                 "ai": system_string
             })
             conv_history.append((user_string, system_string))
-            
-    query = request.json['message']
-    result = conv_interface({"question": query, "chat_history": conv_history})
-    answer = result["answer"]
 
-    chat_history.append({
-        "human": query,
-        "ai": answer
-    })
+
+    llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo', streaming=True)
+    context_response_similarity = vector_index.similarity_search(query=query, k=6)
+
+    messages = [
+                SystemMessage(content=query or ""),
+                HumanMessage(
+                    content=f"Context:\n{context_response_similarity} \n\n#######\nConversation history:\n{conv_history}\n\n#######\nBased on the provided information above, answer the question proposed below. If the text doesn't provide information about it, tell me you are basing your answer on your own knowledge and don't start your response with phrases like the text doesn't provide information about question. Give me only answer. \n\nQuestion:\n{query}"
+                ),
+            ]
+    
+    def generate_response():
+        response_tokens = []
+        for chunk in llm.stream(messages):
+            response_tokens.append(chunk.content)
+            yield chunk.content
+        return response_tokens
+    
+    response_generator = generate_response()
+    response_tokens = list(response_generator)
+    assistant = " ".join(response_tokens)
 
     db_chat_history.append(f"human:{query}")
-    db_chat_history.append(f"ai:{answer}")
-
+    db_chat_history.append(f"ai:{assistant}")
     chatbot_session.chat_history = db_chat_history
     
     flag_modified(chatbot_session,'chat_history')
     db.session.commit()
 
-    return { "answer": answer, "chat_history": chat_history }
+    return Response(generate_response(), mimetype='text/event-stream')
 
 @chatbot_bp.route('/avatar/<img_id>')
 def get_image(img_id):

@@ -30,6 +30,7 @@ def validate_email_and_password(email, password):
 @token_required
 def user_info(current_user):
     return {
+        'id': current_user.id,
         'first_name': current_user.first_name,
         'last_name': current_user.last_name,
         'email': current_user.email,
