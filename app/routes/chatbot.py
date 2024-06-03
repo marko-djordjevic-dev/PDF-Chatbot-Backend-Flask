@@ -255,7 +255,7 @@ def get_ai_resposne():
     messages = [
                 SystemMessage(content=query or ""),
                 HumanMessage(
-                    content=f"Context:\n{context_response_similarity} \n\n#######\nConversation history:\n{conv_history}\n\n#######\nBased on the provided information above, answer the question proposed below. If the text doesn't provide information about it, tell me you are basing your answer on your own knowledge and don't start your response with phrases like the text doesn't provide information about question. Give me only answer. \n\nQuestion:\n{query}"
+                    content=f"Context:\n{context_response_similarity} \n\n#######\nChat History:\n{conv_history}\n\n#######\nBased on the provided information above and chat history, answer the question proposed below. If the text doesn't provide information about it, tell me you are basing your answer on your own knowledge and don't start your response with phrases like the text doesn't provide information about question or I am sorry. Give me only answer. \n\nQuestion:\n{query}"
                 ),
             ]
     
