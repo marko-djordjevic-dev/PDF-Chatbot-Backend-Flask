@@ -250,13 +250,13 @@ def get_ai_resposne():
             conv_history += "\n" + "\n".join([human, ai])
 
 
-    llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo', streaming=True)
+    llm = ChatOpenAI(temperature=0.7, api_key=Config.OPENAI_KEY, model_name='gpt-3.5-turbo', streaming=True, max_tokens=1000)
     context_response_similarity = vector_index.similarity_search(query=query, k=6)
 
     messages = [
                 SystemMessage(content=query or ""),
                 HumanMessage(
-                    content=f"Context:\n{context_response_similarity} \n\n#######\nChat History:\n{conv_history}\n\n#######\nBased on the provided information above and chat history, answer the question proposed below. If the text doesn't provide information about it, tell me you are basing your answer on your own knowledge and don't start your response with phrases like the text doesn't provide information about question or I am sorry. Give me only answer. \n\nQuestion:\n{query}"
+                    content=f"Context:\n{context_response_similarity} \n\n#######\nChat History:\n{conv_history}\n\n#######\nBased on the provided information above and chat history, answer the question proposed below. If the text doesn't provide information about it, tell me you are basing your answer on your own knowledge and don't start your response with phrases like the text doesn't provide information about question or I am sorry. Give me only answer and it should be long. \n\nQuestion:\n{query}"
                 ),
             ]
     
