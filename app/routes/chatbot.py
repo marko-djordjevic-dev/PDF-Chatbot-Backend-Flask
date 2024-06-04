@@ -193,7 +193,8 @@ def chatbot_setting_session():
         'initial' : bot.initial,
         'placeholder' : bot.placeholder,
         'suggested' : bot.suggested,
-        'img_id' : bot.img_id
+        'img_id' : bot.img_id,
+        'name' : bot.name
     }
 
 @chatbot_bp.route('/create_session', methods=['POST'])

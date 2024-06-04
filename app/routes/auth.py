@@ -1,3 +1,4 @@
+import uuid
 from flask import Blueprint, request
 from ..models.User import User
 from .. import bcrypt
@@ -34,7 +35,33 @@ def user_info(current_user):
         'first_name': current_user.first_name,
         'last_name': current_user.last_name,
         'email': current_user.email,
-        'superuser': current_user.superuser
+        'superuser': current_user.superuser,
+        'img_id': current_user.img_id
+    }
+
+@auth_bp.route('/update_profile', methods=['POST'])
+@token_required
+def update_profile(current_user):
+    user = User.query.filter_by(id=current_user.id).first()
+    user.first_name = request.form['first_name']
+    user.last_name = request.form['last_name']
+    if len(request.files) > 0:
+        file_key = next(iter(request.files))
+        file = request.files[file_key]
+        if file:
+            img_id = uuid.uuid4().hex
+            file.save(f"app/avatar/{img_id}")
+            user.img_id = img_id
+    
+    db.session.commit()
+
+    return {
+        'id': user.id,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email,
+        'superuser': user.superuser,
+        'img_id': user.img_id
     }
 
 @auth_bp.route('/register', methods=['POST'])
@@ -85,5 +112,26 @@ def login():
         'email': validated_user.email,
         'first_name': validated_user.first_name,
         'last_name': validated_user.last_name,
-        'superuser': validated_user.superuser
+        'superuser': validated_user.superuser,
+        'img_id': validated_user.img_id,
     }}
+
+
+@auth_bp.route('/update_password', methods=['POST'])
+@token_required
+def update_password(current_user):
+    user = User.query.filter_by(id=current_user.id).first()
+    data = request.json
+    if bcrypt.check_password_hash(user.password, data['currentPassword']) is False:
+        return {'message' : 'Current password is not correct'}, 400
+
+    if data['newPassword'] != data['confirmPassword']:
+        return {'message' : 'Password do not match'}, 400
+    
+    if len(data['newPassword']) < 6:
+        return {'message' : 'Password length must be at least 6!'}, 400
+
+    user.password = bcrypt.generate_password_hash(data['newPassword'], 10).decode('utf-8'),
+    db.session.commit()
+
+    return { "message": "Password updated successfully" }

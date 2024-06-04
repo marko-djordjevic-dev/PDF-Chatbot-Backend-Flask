@@ -9,3 +9,4 @@ class User(db.Model):
     password = db.Column(db.String(64))
     superuser = db.Column(db.Integer)
     chatbot_sessions = db.relationship('ChatbotSession', backref = 'user')
+    img_id  = db.Column(db.String(64))
